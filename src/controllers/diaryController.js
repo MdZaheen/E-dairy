@@ -1,4 +1,5 @@
 const Diary = require("../models/Diary");
+const User = require("../models/User");
 
 // ============================================
 // STAFF OPERATIONS
@@ -9,11 +10,25 @@ const Diary = require("../models/Diary");
 // @access  Staff
 const addEntry = async (req, res) => {
     try {
+        // 1. Extract staffId from JWT token (NOT from request body)
+        const staffId = req.user._id;
+
+        // 2. Fetch staff's departmentId from the User model
+        const staff = await User.findById(staffId).select("departmentId");
+        if (!staff || !staff.departmentId) {
+            return res.status(400).json({
+                success: false,
+                message: "You are not assigned to any department. Contact admin.",
+            });
+        }
+
+        // 3. Only accept allowed fields from body (ignore status, approvedBy, departmentId)
         const { date, subject, semester, section, hoursTaken, workType, description } = req.body;
 
+        // 4. Create diary entry — status defaults to "Pending" from schema
         const entry = await Diary.create({
-            staffId: req.user._id,
-            departmentId: req.user.departmentId,
+            staffId,
+            departmentId: staff.departmentId,
             date,
             subject,
             semester,
@@ -21,12 +36,18 @@ const addEntry = async (req, res) => {
             hoursTaken,
             workType,
             description,
+            // status, approvedBy, remarks are NOT accepted from client
         });
+
+        // 5. Return populated response
+        const populatedEntry = await Diary.findById(entry._id)
+            .populate("departmentId", "departmentName")
+            .populate("staffId", "name email");
 
         res.status(201).json({
             success: true,
             message: "Diary entry added successfully",
-            data: entry,
+            data: populatedEntry,
         });
     } catch (error) {
         if (error.name === "ValidationError") {
