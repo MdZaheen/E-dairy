@@ -181,7 +181,7 @@ const approveEntry = async (req, res) => {
 
         entry.status = "Approved";
         entry.approvedBy = req.user._id;
-        entry.remarks = req.body.remarks || "";
+        entry.remarks = ""; // Clear remarks on approval
         await entry.save();
 
         res.status(200).json({
