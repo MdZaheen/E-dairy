@@ -105,15 +105,24 @@ const getEntriesByDateRange = async (req, res) => {
 
 // ============================================
 // @desc    Get status counts (approved vs pending vs rejected)
-// @route   GET /api/reports/status-counts?departmentId=xxx&year=2026&month=2
-// @access  HOD, Admin
+// @route   GET /api/reports/status-counts?year=2026&month=2
+// @access  HOD (dept only), Admin (global)
 // ============================================
 const getStatusCounts = async (req, res) => {
     try {
-        const { departmentId, year, month } = req.query;
+        const { year, month } = req.query;
+        const mongoose = require("mongoose");
 
         const matchStage = {};
-        if (departmentId) matchStage.departmentId = require("mongoose").Types.ObjectId.createFromHexString(departmentId);
+
+        // HOD → auto-scope to their department (cannot see other depts)
+        // Admin → sees global data, or can filter by departmentId
+        if (req.user.role === "HOD") {
+            matchStage.departmentId = req.user.departmentId;
+        } else if (req.query.departmentId) {
+            matchStage.departmentId = new mongoose.Types.ObjectId(req.query.departmentId);
+        }
+
         if (year && month) {
             matchStage.date = {
                 $gte: new Date(parseInt(year), parseInt(month) - 1, 1),
@@ -152,15 +161,24 @@ const getStatusCounts = async (req, res) => {
 
 // ============================================
 // @desc    Get total hours per staff member
-// @route   GET /api/reports/staff-hours?departmentId=xxx&year=2026&month=2
-// @access  HOD, Admin
+// @route   GET /api/reports/staff-hours?year=2026&month=2
+// @access  HOD (dept only), Admin (global)
 // ============================================
 const getTotalHoursPerStaff = async (req, res) => {
     try {
-        const { departmentId, year, month } = req.query;
+        const { year, month } = req.query;
+        const mongoose = require("mongoose");
 
         const matchStage = { status: "Approved" }; // Only count approved entries
-        if (departmentId) matchStage.departmentId = require("mongoose").Types.ObjectId.createFromHexString(departmentId);
+
+        // HOD → auto-scope to their department
+        // Admin → sees global data, or can filter by departmentId
+        if (req.user.role === "HOD") {
+            matchStage.departmentId = req.user.departmentId;
+        } else if (req.query.departmentId) {
+            matchStage.departmentId = new mongoose.Types.ObjectId(req.query.departmentId);
+        }
+
         if (year && month) {
             matchStage.date = {
                 $gte: new Date(parseInt(year), parseInt(month) - 1, 1),
