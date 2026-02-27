@@ -230,8 +230,8 @@ const getAllDepartments = async (req, res) => {
 // DIARY MANAGEMENT
 // ============================================
 
-// @desc    View all diary entries (with filters)
-// @route   GET /api/admin/diary
+// @desc    View all diary entries (with filters + pagination)
+// @route   GET /api/admin/diary?page=1&limit=10&status=Pending
 // @access  Admin
 const getAllDiaryEntries = async (req, res) => {
     try {
@@ -241,8 +241,16 @@ const getAllDiaryEntries = async (req, res) => {
         if (req.query.departmentId) filter.departmentId = req.query.departmentId;
         if (req.query.staffId) filter.staffId = req.query.staffId;
 
+        // Pagination
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+
+        const total = await Diary.countDocuments(filter);
         const entries = await Diary.find(filter)
             .sort({ date: -1 })
+            .skip(skip)
+            .limit(limit)
             .populate("staffId", "name email")
             .populate("departmentId", "departmentName")
             .populate("approvedBy", "name");
@@ -250,6 +258,9 @@ const getAllDiaryEntries = async (req, res) => {
         res.status(200).json({
             success: true,
             count: entries.length,
+            total,
+            page,
+            totalPages: Math.ceil(total / limit),
             data: entries,
         });
     } catch (error) {

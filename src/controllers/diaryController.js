@@ -58,19 +58,34 @@ const addEntry = async (req, res) => {
     }
 };
 
-// @desc    Get own diary entries
-// @route   GET /api/diary/my-entries
+// @desc    Get own diary entries (with pagination)
+// @route   GET /api/diary/my-entries?page=1&limit=10&status=Pending
 // @access  Staff
 const getMyEntries = async (req, res) => {
     try {
-        const entries = await Diary.find({ staffId: req.user._id })
+        // Backend enforced filter — always uses JWT staffId
+        const filter = { staffId: req.user._id };
+        if (req.query.status) filter.status = req.query.status;
+
+        // Pagination
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+
+        const total = await Diary.countDocuments(filter);
+        const entries = await Diary.find(filter)
             .sort({ date: -1 })
+            .skip(skip)
+            .limit(limit)
             .populate("departmentId", "departmentName")
             .populate("approvedBy", "name");
 
         res.status(200).json({
             success: true,
             count: entries.length,
+            total,
+            page,
+            totalPages: Math.ceil(total / limit),
             data: entries,
         });
     } catch (error) {
@@ -130,22 +145,70 @@ const updateEntry = async (req, res) => {
 // HOD OPERATIONS
 // ============================================
 
-// @desc    View all pending entries in HOD's department
+// @desc    View all entries in HOD's department (with pagination)
+// @route   GET /api/diary/department?page=1&limit=10&status=Pending
+// @access  HOD
+const getDepartmentEntries = async (req, res) => {
+    try {
+        // Backend enforced filter — always uses HOD's departmentId
+        const filter = { departmentId: req.user.departmentId };
+        if (req.query.status) filter.status = req.query.status;
+
+        // Pagination
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+
+        const total = await Diary.countDocuments(filter);
+        const entries = await Diary.find(filter)
+            .sort({ date: -1 })
+            .skip(skip)
+            .limit(limit)
+            .populate("staffId", "name email")
+            .populate("departmentId", "departmentName")
+            .populate("approvedBy", "name");
+
+        res.status(200).json({
+            success: true,
+            count: entries.length,
+            total,
+            page,
+            totalPages: Math.ceil(total / limit),
+            data: entries,
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Server error", error: error.message });
+    }
+};
+
+// @desc    View pending entries only (shortcut)
 // @route   GET /api/diary/department/pending
 // @access  HOD
 const getDepartmentPendingEntries = async (req, res) => {
     try {
-        const entries = await Diary.find({
+        const filter = {
             departmentId: req.user.departmentId,
             status: "Pending",
-        })
+        };
+
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+
+        const total = await Diary.countDocuments(filter);
+        const entries = await Diary.find(filter)
             .sort({ date: -1 })
+            .skip(skip)
+            .limit(limit)
             .populate("staffId", "name email")
             .populate("departmentId", "departmentName");
 
         res.status(200).json({
             success: true,
             count: entries.length,
+            total,
+            page,
+            totalPages: Math.ceil(total / limit),
             data: entries,
         });
     } catch (error) {
@@ -246,6 +309,7 @@ module.exports = {
     addEntry,
     getMyEntries,
     updateEntry,
+    getDepartmentEntries,
     getDepartmentPendingEntries,
     approveEntry,
     rejectEntry,
