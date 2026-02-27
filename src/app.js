@@ -20,5 +20,6 @@ app.use(express.json());
 app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/diary", require("./routes/diaryRoutes"));
 app.use("/api/admin", require("./routes/adminRoutes"));
+app.use("/api/reports", require("./routes/reportRoutes"));
 
 module.exports = app;
