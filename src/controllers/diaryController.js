@@ -1,0 +1,316 @@
+const Diary = require("../models/Diary");
+const User = require("../models/User");
+
+// ============================================
+// STAFF OPERATIONS
+// ============================================
+
+// @desc    Add a new diary entry
+// @route   POST /api/diary
+// @access  Staff
+const addEntry = async (req, res) => {
+    try {
+        // 1. Extract staffId from JWT token (NOT from request body)
+        const staffId = req.user._id;
+
+        // 2. Fetch staff's departmentId from the User model
+        const staff = await User.findById(staffId).select("departmentId");
+        if (!staff || !staff.departmentId) {
+            return res.status(400).json({
+                success: false,
+                message: "You are not assigned to any department. Contact admin.",
+            });
+        }
+
+        // 3. Only accept allowed fields from body (ignore status, approvedBy, departmentId)
+        const { date, subject, semester, section, hoursTaken, workType, description } = req.body;
+
+        // 4. Create diary entry — status defaults to "Pending" from schema
+        const entry = await Diary.create({
+            staffId,
+            departmentId: staff.departmentId,
+            date,
+            subject,
+            semester,
+            section,
+            hoursTaken,
+            workType,
+            description,
+            // status, approvedBy, remarks are NOT accepted from client
+        });
+
+        // 5. Return populated response
+        const populatedEntry = await Diary.findById(entry._id)
+            .populate("departmentId", "departmentName")
+            .populate("staffId", "name email");
+
+        res.status(201).json({
+            success: true,
+            message: "Diary entry added successfully",
+            data: populatedEntry,
+        });
+    } catch (error) {
+        if (error.name === "ValidationError") {
+            const messages = Object.values(error.errors).map((err) => err.message);
+            return res.status(400).json({ success: false, message: messages.join(", ") });
+        }
+        res.status(500).json({ success: false, message: "Server error", error: error.message });
+    }
+};
+
+// @desc    Get own diary entries (with pagination)
+// @route   GET /api/diary/my-entries?page=1&limit=10&status=Pending
+// @access  Staff
+const getMyEntries = async (req, res) => {
+    try {
+        // Backend enforced filter — always uses JWT staffId
+        const filter = { staffId: req.user._id };
+        if (req.query.status) filter.status = req.query.status;
+
+        // Pagination
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+
+        const total = await Diary.countDocuments(filter);
+        const entries = await Diary.find(filter)
+            .sort({ date: -1 })
+            .skip(skip)
+            .limit(limit)
+            .populate("departmentId", "departmentName")
+            .populate("approvedBy", "name");
+
+        res.status(200).json({
+            success: true,
+            count: entries.length,
+            total,
+            page,
+            totalPages: Math.ceil(total / limit),
+            data: entries,
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Server error", error: error.message });
+    }
+};
+
+// @desc    Update diary entry (only if status is Pending)
+// @route   PUT /api/diary/:id
+// @access  Staff
+const updateEntry = async (req, res) => {
+    try {
+        const entry = await Diary.findById(req.params.id);
+
+        if (!entry) {
+            return res.status(404).json({ success: false, message: "Diary entry not found" });
+        }
+
+        // Check ownership — staff can only edit their own entries
+        if (entry.staffId.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ success: false, message: "You can only edit your own entries" });
+        }
+
+        // Check status — only Pending entries can be edited
+        if (entry.status !== "Pending") {
+            return res.status(400).json({
+                success: false,
+                message: `Cannot edit entry. Status is '${entry.status}'. Only 'Pending' entries can be edited.`,
+            });
+        }
+
+        // Update allowed fields only
+        const allowedFields = ["date", "subject", "semester", "section", "hoursTaken", "workType", "description"];
+        allowedFields.forEach((field) => {
+            if (req.body[field] !== undefined) {
+                entry[field] = req.body[field];
+            }
+        });
+
+        await entry.save();
+
+        res.status(200).json({
+            success: true,
+            message: "Diary entry updated successfully",
+            data: entry,
+        });
+    } catch (error) {
+        if (error.name === "ValidationError") {
+            const messages = Object.values(error.errors).map((err) => err.message);
+            return res.status(400).json({ success: false, message: messages.join(", ") });
+        }
+        res.status(500).json({ success: false, message: "Server error", error: error.message });
+    }
+};
+
+// ============================================
+// HOD OPERATIONS
+// ============================================
+
+// @desc    View all entries in HOD's department (with pagination)
+// @route   GET /api/diary/department?page=1&limit=10&status=Pending
+// @access  HOD
+const getDepartmentEntries = async (req, res) => {
+    try {
+        // Backend enforced filter — always uses HOD's departmentId
+        const filter = { departmentId: req.user.departmentId };
+        if (req.query.status) filter.status = req.query.status;
+
+        // Pagination
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+
+        const total = await Diary.countDocuments(filter);
+        const entries = await Diary.find(filter)
+            .sort({ date: -1 })
+            .skip(skip)
+            .limit(limit)
+            .populate("staffId", "name email")
+            .populate("departmentId", "departmentName")
+            .populate("approvedBy", "name");
+
+        res.status(200).json({
+            success: true,
+            count: entries.length,
+            total,
+            page,
+            totalPages: Math.ceil(total / limit),
+            data: entries,
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Server error", error: error.message });
+    }
+};
+
+// @desc    View pending entries only (shortcut)
+// @route   GET /api/diary/department/pending
+// @access  HOD
+const getDepartmentPendingEntries = async (req, res) => {
+    try {
+        const filter = {
+            departmentId: req.user.departmentId,
+            status: "Pending",
+        };
+
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+
+        const total = await Diary.countDocuments(filter);
+        const entries = await Diary.find(filter)
+            .sort({ date: -1 })
+            .skip(skip)
+            .limit(limit)
+            .populate("staffId", "name email")
+            .populate("departmentId", "departmentName");
+
+        res.status(200).json({
+            success: true,
+            count: entries.length,
+            total,
+            page,
+            totalPages: Math.ceil(total / limit),
+            data: entries,
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Server error", error: error.message });
+    }
+};
+
+// @desc    Approve a diary entry
+// @route   PUT /api/diary/:id/approve
+// @access  HOD
+const approveEntry = async (req, res) => {
+    try {
+        const entry = await Diary.findById(req.params.id);
+
+        if (!entry) {
+            return res.status(404).json({ success: false, message: "Diary entry not found" });
+        }
+
+        // HOD can only approve entries from their own department
+        if (entry.departmentId.toString() !== req.user.departmentId.toString()) {
+            return res.status(403).json({
+                success: false,
+                message: "You can only approve entries in your department",
+            });
+        }
+
+        if (entry.status !== "Pending") {
+            return res.status(400).json({
+                success: false,
+                message: `Entry already '${entry.status}'. Only 'Pending' entries can be approved.`,
+            });
+        }
+
+        entry.status = "Approved";
+        entry.approvedBy = req.user._id;
+        entry.remarks = ""; // Clear remarks on approval
+        await entry.save();
+
+        res.status(200).json({
+            success: true,
+            message: "Diary entry approved",
+            data: entry,
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Server error", error: error.message });
+    }
+};
+
+// @desc    Reject a diary entry (with remarks)
+// @route   PUT /api/diary/:id/reject
+// @access  HOD
+const rejectEntry = async (req, res) => {
+    try {
+        const entry = await Diary.findById(req.params.id);
+
+        if (!entry) {
+            return res.status(404).json({ success: false, message: "Diary entry not found" });
+        }
+
+        // HOD can only reject entries from their own department
+        if (entry.departmentId.toString() !== req.user.departmentId.toString()) {
+            return res.status(403).json({
+                success: false,
+                message: "You can only reject entries in your department",
+            });
+        }
+
+        if (entry.status !== "Pending") {
+            return res.status(400).json({
+                success: false,
+                message: `Entry already '${entry.status}'. Only 'Pending' entries can be rejected.`,
+            });
+        }
+
+        if (!req.body.remarks) {
+            return res.status(400).json({
+                success: false,
+                message: "Remarks are required when rejecting an entry",
+            });
+        }
+
+        entry.status = "Rejected";
+        entry.approvedBy = req.user._id;
+        entry.remarks = req.body.remarks;
+        await entry.save();
+
+        res.status(200).json({
+            success: true,
+            message: "Diary entry rejected",
+            data: entry,
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Server error", error: error.message });
+    }
+};
+
+module.exports = {
+    addEntry,
+    getMyEntries,
+    updateEntry,
+    getDepartmentEntries,
+    getDepartmentPendingEntries,
+    approveEntry,
+    rejectEntry,
+};
