@@ -9,11 +9,11 @@ const {
     getDepartmentStaff,
 } = require("../controllers/departmentController");
 
-// All department routes require authentication
-router.use(verifyToken);
-
-// GET  /api/departments          → List all departments (any authenticated user)
+// GET  /api/departments          → List all departments (Public access for Registration)
 router.get("/", getAllDepartments);
+
+// All other department routes require authentication
+router.use(verifyToken);
 
 // GET  /api/departments/:id      → Get single department by ID (any authenticated user)
 router.get("/:id", validateObjectId("id"), getDepartmentById);
