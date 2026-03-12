@@ -1,5 +1,6 @@
 const Diary = require("../models/Diary");
 const { getStaffMonthlyReport, getDepartmentWorkload } = require("../services/reportService");
+const { getMonthlyStats } = require("../services/diaryService");
 
 // ============================================
 // @desc    Get monthly report for a staff member
@@ -227,10 +228,40 @@ const getTotalHoursPerStaff = async (req, res) => {
     }
 };
 
+
+// ============================================
+// @desc    Get own monthly summary (staff self-service)
+// @route   GET /api/reports/my-monthly?year=2026&month=2
+// @access  Staff, HOD, Admin
+// ============================================
+const myMonthlyStats = async (req, res) => {
+    try {
+        const { year, month } = req.query;
+
+        if (!year || !month) {
+            return res.status(400).json({
+                success: false,
+                message: "Please provide 'year' and 'month' as query parameters",
+            });
+        }
+
+        const stats = await getMonthlyStats(req.user._id, parseInt(year), parseInt(month));
+
+        res.status(200).json({
+            success: true,
+            message: `Your monthly stats for ${month}/${year}`,
+            data: stats,
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Server error", error: error.message });
+    }
+};
+
 module.exports = {
     staffMonthlyReport,
     departmentWorkloadReport,
     getEntriesByDateRange,
     getStatusCounts,
     getTotalHoursPerStaff,
+    myMonthlyStats,
 };

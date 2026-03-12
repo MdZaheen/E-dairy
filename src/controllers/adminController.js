@@ -1,6 +1,7 @@
 const User = require("../models/User");
 const Department = require("../models/Department");
 const Diary = require("../models/Diary");
+const Subject = require("../models/Subject");
 const { hashPassword } = require("../utils/hashPassword");
 
 // ============================================
@@ -268,6 +269,90 @@ const getAllDiaryEntries = async (req, res) => {
     }
 };
 
+// ============================================
+// SUBJECT MANAGEMENT
+// ============================================
+
+// @desc    Create a new subject
+// @route   POST /api/admin/subjects
+// @access  Admin
+const createSubject = async (req, res) => {
+    try {
+        const { subjectName, subjectCode, departmentId, semester } = req.body;
+
+        // Validate department exists
+        const dept = await Department.findById(departmentId);
+        if (!dept) {
+            return res.status(404).json({ success: false, message: "Department not found" });
+        }
+
+        const subject = await Subject.create({
+            subjectName,
+            subjectCode: subjectCode || "",
+            departmentId,
+            semester,
+        });
+
+        res.status(201).json({
+            success: true,
+            message: "Subject created successfully",
+            data: subject,
+        });
+    } catch (error) {
+        if (error.name === "ValidationError") {
+            const messages = Object.values(error.errors).map((err) => err.message);
+            return res.status(400).json({ success: false, message: messages.join(", ") });
+        }
+        res.status(500).json({ success: false, message: "Server error", error: error.message });
+    }
+};
+
+// @desc    Get all subjects (optionally filter by department)
+// @route   GET /api/admin/subjects?departmentId=xxx&semester=3
+// @access  Admin
+const getAllSubjects = async (req, res) => {
+    try {
+        const filter = {};
+        if (req.query.departmentId) filter.departmentId = req.query.departmentId;
+        if (req.query.semester) filter.semester = parseInt(req.query.semester);
+
+        const subjects = await Subject.find(filter)
+            .populate("departmentId", "departmentName")
+            .sort({ subjectName: 1 });
+
+        res.status(200).json({
+            success: true,
+            count: subjects.length,
+            data: subjects,
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Server error", error: error.message });
+    }
+};
+
+// @desc    Delete a subject
+// @route   DELETE /api/admin/subjects/:id
+// @access  Admin
+const deleteSubject = async (req, res) => {
+    try {
+        const subject = await Subject.findByIdAndDelete(req.params.id);
+
+        if (!subject) {
+            return res.status(404).json({ success: false, message: "Subject not found" });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: `Subject '${subject.subjectName}' deleted successfully`,
+        });
+    } catch (error) {
+        if (error.name === "CastError") {
+            return res.status(400).json({ success: false, message: "Invalid subject ID" });
+        }
+        res.status(500).json({ success: false, message: "Server error", error: error.message });
+    }
+};
+
 module.exports = {
     createUser,
     getAllUsers,
@@ -277,4 +362,7 @@ module.exports = {
     createDepartment,
     getAllDepartments,
     getAllDiaryEntries,
+    createSubject,
+    getAllSubjects,
+    deleteSubject,
 };

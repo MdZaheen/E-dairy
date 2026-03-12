@@ -1,5 +1,6 @@
 const Diary = require("../models/Diary");
 const User = require("../models/User");
+const ApprovalLog = require("../models/ApprovalLog");
 
 // ============================================
 // STAFF OPERATIONS
@@ -247,6 +248,13 @@ const approveEntry = async (req, res) => {
         entry.remarks = ""; // Clear remarks on approval
         await entry.save();
 
+        // Log the approval action
+        await ApprovalLog.create({
+            diaryId: entry._id,
+            actionBy: req.user._id,
+            action: "Approved",
+        });
+
         res.status(200).json({
             success: true,
             message: "Diary entry approved",
@@ -294,6 +302,14 @@ const rejectEntry = async (req, res) => {
         entry.approvedBy = req.user._id;
         entry.remarks = req.body.remarks;
         await entry.save();
+
+        // Log the rejection action
+        await ApprovalLog.create({
+            diaryId: entry._id,
+            actionBy: req.user._id,
+            action: "Rejected",
+            remarks: req.body.remarks,
+        });
 
         res.status(200).json({
             success: true,

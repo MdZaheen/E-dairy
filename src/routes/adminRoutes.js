@@ -11,6 +11,9 @@ const {
     createDepartment,
     getAllDepartments,
     getAllDiaryEntries,
+    createSubject,
+    getAllSubjects,
+    deleteSubject,
 } = require("../controllers/adminController");
 
 // All routes require Admin role
@@ -29,5 +32,10 @@ router.get("/departments", getAllDepartments);         // Get all departments
 
 // ============ DIARY MANAGEMENT ============
 router.get("/diary", getAllDiaryEntries);              // View all entries (with filters)
+
+// ============ SUBJECT MANAGEMENT ============
+router.post("/subjects", createSubject);               // Create subject
+router.get("/subjects", getAllSubjects);                // Get all subjects
+router.delete("/subjects/:id", deleteSubject);          // Delete subject
 
 module.exports = router;
