@@ -4,6 +4,7 @@ const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const connectDB = require("./config/db");
 const errorHandler = require("./middleware/errorHandler");
+const { morganMiddleware } = require("./utils/logger");
 
 // Create Express app
 const app = express();
@@ -15,6 +16,9 @@ connectDB();
 app.use(helmet());   // Sets secure HTTP headers
 app.use(cors());
 app.use(express.json({ limit: "10kb" })); // Limit body size to prevent abuse
+
+// HTTP Request Logger
+app.use(morganMiddleware);
 
 // Rate Limiting — max 100 requests per 15 min per IP
 const generalLimiter = rateLimit({
@@ -37,6 +41,8 @@ app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/diary", require("./routes/diaryRoutes"));
 app.use("/api/admin", require("./routes/adminRoutes"));
 app.use("/api/reports", require("./routes/reportRoutes"));
+app.use("/api/departments", require("./routes/departmentRoutes"));
+app.use("/api/users", require("./routes/userRoutes"));
 
 // Global Error Handler (must be AFTER all routes)
 app.use(errorHandler);

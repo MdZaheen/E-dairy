@@ -8,9 +8,13 @@ const {
     getEntriesByDateRange,
     getStatusCounts,
     getTotalHoursPerStaff,
+    myMonthlyStats,
 } = require("../controllers/reportController");
 
-// All report routes require HOD or Admin role
+// GET /api/reports/my-monthly?year=2026&month=2 — any authenticated user
+router.get("/my-monthly", verifyToken, myMonthlyStats);
+
+// All remaining report routes require HOD or Admin role
 router.use(verifyToken, authorizeRoles("HOD", "Admin"));
 
 // GET /api/reports/staff/:staffId/monthly?year=2026&month=2

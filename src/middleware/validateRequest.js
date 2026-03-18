@@ -4,6 +4,9 @@
 
 // Validate register input
 const validateRegister = (req, res, next) => {
+    if (!req.body) {
+        return res.status(400).json({ success: false, message: "Request body is empty. Send JSON with Content-Type: application/json" });
+    }
     const { name, email, password } = req.body;
     const errors = [];
 
@@ -32,6 +35,9 @@ const validateRegister = (req, res, next) => {
 
 // Validate login input
 const validateLogin = (req, res, next) => {
+    if (!req.body) {
+        return res.status(400).json({ success: false, message: "Request body is empty. Send JSON with Content-Type: application/json" });
+    }
     const { email, password } = req.body;
     const errors = [];
 
@@ -49,6 +55,9 @@ const validateLogin = (req, res, next) => {
 
 // Validate diary entry input
 const validateDiaryEntry = (req, res, next) => {
+    if (!req.body) {
+        return res.status(400).json({ success: false, message: "Request body is empty. Send JSON with Content-Type: application/json" });
+    }
     const { date, subject, semester, section, hoursTaken, workType } = req.body;
     const errors = [];
 
