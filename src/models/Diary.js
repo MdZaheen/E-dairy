@@ -79,6 +79,41 @@ const diarySchema = new mongoose.Schema(
             trim: true,
             default: "",
         },
+
+        // ============ SMART TIMETABLE FIELDS ============
+
+        // Reference to the timetable slot that generated this entry (null for manual entries)
+        timetableSlotId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Timetable",
+            default: null,
+        },
+
+        // Reference to the course assignment (null for manual entries)
+        courseAssignmentId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "CourseAssignment",
+            default: null,
+        },
+
+        // Auto-incremented lesson number per course+section (null for manual entries)
+        lessonNo: {
+            type: Number,
+            default: null,
+        },
+
+        // Marks if the class was not taken (cancelled, holiday, etc.)
+        notTaken: {
+            type: Boolean,
+            default: false,
+        },
+
+        // Reason provided when class was not taken
+        notTakenReason: {
+            type: String,
+            trim: true,
+            default: "",
+        },
     },
     {
         timestamps: true,
