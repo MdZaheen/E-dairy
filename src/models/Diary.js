@@ -27,7 +27,8 @@ const diarySchema = new mongoose.Schema(
 
         semester: {
             type: Number,
-            required: [true, "Semester is required"],
+            required: false,
+            default: null,
             min: [1, "Semester must be at least 1"],
             max: [8, "Semester cannot exceed 8"],
         },
@@ -41,7 +42,7 @@ const diarySchema = new mongoose.Schema(
         hoursTaken: {
             type: Number,
             required: [true, "Hours taken is required"],
-            min: [1, "Hours must be at least 1"],
+            min: [0.5, "Hours must be at least 0.5"],
             max: [8, "Hours cannot exceed 8 per day"],
         },
 

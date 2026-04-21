@@ -30,7 +30,7 @@ const saveTimetable = async (req, res) => {
             return res.status(400).json({ success: false, message: "slots array is required" });
         }
 
-        // Validate required fields per slot
+        // Validate required fields per slot before touching the database
         for (const slot of slots) {
             if (!slot.subjectName || !slot.section || !slot.dayOfWeek || !slot.startTime || !slot.endTime) {
                 return res.status(400).json({
@@ -40,10 +40,17 @@ const saveTimetable = async (req, res) => {
             }
         }
 
-        // Hard-delete all existing slots for this staff so the old unique index
-        // (staffId, courseAssignmentId, dayOfWeek, section) cannot cause conflicts
-        await Timetable.deleteMany({ staffId });
+        // ── Step 1: Drop the old unique index (safe no-op if already gone) ──────
+        try {
+            await Timetable.collection.dropIndex("staffId_1_courseAssignmentId_1_dayOfWeek_1_section_1");
+        } catch { /* already dropped — ignore */ }
 
+        // ── Step 2: Record current slot IDs BEFORE any write ─────────────────────
+        const oldDocs = await Timetable.find({ staffId }, "_id");
+        const oldIds  = oldDocs.map((d) => d._id);
+
+        // ── Step 3: INSERT the new slots first ────────────────────────────────────
+        // If this fails, old data is still intact — nothing has been deleted yet.
         const toInsert = slots.map((slot) => ({
             staffId,
             courseAssignmentId: slot.courseAssignmentId || null,
@@ -60,6 +67,11 @@ const saveTimetable = async (req, res) => {
 
         const inserted = await Timetable.insertMany(toInsert);
 
+        // ── Step 4: ONLY NOW delete the old slots (insert already succeeded) ─────
+        if (oldIds.length > 0) {
+            await Timetable.deleteMany({ _id: { $in: oldIds } });
+        }
+
         res.status(201).json({
             success: true,
             message: `${inserted.length} timetable slot(s) saved`,
@@ -70,6 +82,7 @@ const saveTimetable = async (req, res) => {
         res.status(500).json({ success: false, message: "Server error", error: error.message });
     }
 };
+
 
 // ============================================
 // @desc    Get full weekly timetable for the logged-in staff

@@ -2,8 +2,6 @@ const Diary = require("../models/Diary");
 const User = require("../models/User");
 const ApprovalLog = require("../models/ApprovalLog");
 const Timetable = require("../models/Timetable");
-const CourseAssignment = require("../models/CourseAssignment");
-const Subject = require("../models/Subject");
 
 // Helper: compute hours between two HH:MM strings
 const calcHours = (startTime, endTime) => {
@@ -395,7 +393,7 @@ const addEntryFromTimetable = async (req, res) => {
             departmentId: staff.departmentId,
             date: entryDate,
             subject: slot.subjectName,
-            semester: slot.semester || 1,
+            semester: slot.semester,   // null if not set by staff (stored as-is)
             section: slot.section,
             hoursTaken: calcHours(slot.startTime, slot.endTime),
             workType: diaryWorkType,
