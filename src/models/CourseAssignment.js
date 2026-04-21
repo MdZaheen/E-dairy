@@ -8,10 +8,11 @@ const courseAssignmentSchema = new mongoose.Schema(
             required: [true, "Staff ID is required"],
         },
 
-        subjectId: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "Subject",
-            required: [true, "Subject is required"],
+        // Free-text subject name entered by staff
+        subjectName: {
+            type: String,
+            required: [true, "Subject name is required"],
+            trim: true,
         },
 
         semester: {
@@ -67,6 +68,5 @@ const courseAssignmentSchema = new mongoose.Schema(
 // ============================================
 courseAssignmentSchema.index({ staffId: 1 });
 courseAssignmentSchema.index({ staffId: 1, isActive: 1 });
-courseAssignmentSchema.index({ subjectId: 1 });
 
 module.exports = mongoose.model("CourseAssignment", courseAssignmentSchema);

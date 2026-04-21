@@ -1,5 +1,4 @@
 const CourseAssignment = require("../models/CourseAssignment");
-const Subject = require("../models/Subject");
 const User = require("../models/User");
 
 // ============================================
@@ -10,13 +9,7 @@ const User = require("../models/User");
 const createCourseAssignment = async (req, res) => {
     try {
         const staffId = req.user._id;
-        const { subjectId, semester, sections, courseCode, term, totalHours } = req.body;
-
-        // Validate the subject exists
-        const subject = await Subject.findById(subjectId);
-        if (!subject) {
-            return res.status(404).json({ success: false, message: "Subject not found" });
-        }
+        const { subjectName, semester, sections, courseCode, term, totalHours } = req.body;
 
         // Validate sections is a non-empty array
         if (!sections || !Array.isArray(sections) || sections.length === 0) {
@@ -25,7 +18,7 @@ const createCourseAssignment = async (req, res) => {
 
         const assignment = await CourseAssignment.create({
             staffId,
-            subjectId,
+            subjectName,
             semester,
             sections,
             courseCode: courseCode || "",
@@ -33,8 +26,7 @@ const createCourseAssignment = async (req, res) => {
             totalHours: totalHours || 40,
         });
 
-        const populated = await CourseAssignment.findById(assignment._id)
-            .populate("subjectId", "subjectName subjectCode");
+        const populated = await CourseAssignment.findById(assignment._id);
 
         res.status(201).json({
             success: true,
@@ -61,7 +53,6 @@ const getMyCourses = async (req, res) => {
             staffId: req.user._id,
             isActive: true,
         })
-            .populate("subjectId", "subjectName subjectCode departmentId")
             .sort({ createdAt: -1 });
 
         res.status(200).json({
@@ -100,8 +91,7 @@ const updateCourseAssignment = async (req, res) => {
 
         await assignment.save();
 
-        const updated = await CourseAssignment.findById(assignment._id)
-            .populate("subjectId", "subjectName subjectCode");
+        const updated = await CourseAssignment.findById(assignment._id);
 
         res.status(200).json({
             success: true,

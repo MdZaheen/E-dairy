@@ -348,7 +348,7 @@ const addEntryFromTimetable = async (req, res) => {
             return res.status(400).json({ success: false, message: "timetableSlotId and date are required" });
         }
 
-        // 1. Fetch timetable slot
+        // 1. Fetch timetable slot (all info is on the slot itself)
         const slot = await Timetable.findById(timetableSlotId);
         if (!slot) {
             return res.status(404).json({ success: false, message: "Timetable slot not found" });
@@ -357,25 +357,16 @@ const addEntryFromTimetable = async (req, res) => {
             return res.status(403).json({ success: false, message: "This timetable slot does not belong to you" });
         }
 
-        // 2. Fetch course assignment
-        const assignment = await CourseAssignment.findById(slot.courseAssignmentId)
-            .populate("subjectId", "subjectName");
-        if (!assignment) {
-            return res.status(404).json({ success: false, message: "Course assignment not found" });
-        }
-
-        // 3. Fetch staff's departmentId
+        // 2. Fetch staff's departmentId
         const staff = await User.findById(staffId).select("departmentId");
         if (!staff || !staff.departmentId) {
             return res.status(400).json({ success: false, message: "You are not assigned to any department. Contact admin." });
         }
 
-        // 4. Check for duplicate entry (same slot, same day)
+        // 3. Check for duplicate entry (same slot, same day)
         const entryDate = new Date(date);
-        const dayStart = new Date(entryDate);
-        dayStart.setHours(0, 0, 0, 0);
-        const dayEnd = new Date(entryDate);
-        dayEnd.setHours(23, 59, 59, 999);
+        const dayStart = new Date(entryDate); dayStart.setHours(0, 0, 0, 0);
+        const dayEnd   = new Date(entryDate); dayEnd.setHours(23, 59, 59, 999);
 
         const duplicate = await Diary.findOne({
             staffId,
@@ -386,28 +377,31 @@ const addEntryFromTimetable = async (req, res) => {
             return res.status(400).json({ success: false, message: "You have already logged this class for today" });
         }
 
-        // 5. Auto-calculate lesson number (count of past entries for same course + section)
+        // 4. Auto-calculate lesson number
         const lessonNo = await Diary.countDocuments({
             staffId,
-            courseAssignmentId: assignment._id,
-            timetableSlotId: { $ne: null }, // only smart entries
-            // Count entries for the same section only
+            timetableSlotId: { $ne: null },
             section: slot.section,
+            subject: slot.subjectName,
         }) + 1;
 
-        // 6. Auto-fill all fields from timetable + course assignment
+        // 5. Map timetable workType to diary's workType enum
+        const diaryWorkType = (slot.workType === "Lab") ? "Lab" :
+                              (slot.workType === "Teaching" || slot.workType === "Tutorial") ? "Teaching" : "Teaching";
+
+        // 6. Create diary entry using slot's own fields
         const entry = await Diary.create({
             staffId,
             departmentId: staff.departmentId,
             date: entryDate,
-            subject: assignment.subjectId.subjectName,
-            semester: assignment.semester,
+            subject: slot.subjectName,
+            semester: slot.semester || 1,
             section: slot.section,
             hoursTaken: calcHours(slot.startTime, slot.endTime),
-            workType: "Teaching",
+            workType: diaryWorkType,
             description: description || "",
             timetableSlotId: slot._id,
-            courseAssignmentId: assignment._id,
+            courseAssignmentId: slot.courseAssignmentId || null,
             lessonNo,
             notTaken: notTaken || false,
             notTakenReason: notTakenReason || "",
