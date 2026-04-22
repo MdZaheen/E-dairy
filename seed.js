@@ -5,7 +5,7 @@ const connectDB = require("./src/config/db");
 
 const departments = [
     { departmentName: "Computer Science and Engineering" },
-    { departmentName: "Information Technology" },
+    { departmentName: "Information Science and Engineering" },
     { departmentName: "Electronics and Communication Engineering" },
     { departmentName: "Electrical and Electronics Engineering" },
     { departmentName: "Mechanical Engineering" },

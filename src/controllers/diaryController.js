@@ -1,6 +1,15 @@
 const Diary = require("../models/Diary");
 const User = require("../models/User");
 const ApprovalLog = require("../models/ApprovalLog");
+const Timetable = require("../models/Timetable");
+
+// Helper: compute hours between two HH:MM strings
+const calcHours = (startTime, endTime) => {
+    const [sh, sm] = startTime.split(":").map(Number);
+    const [eh, em] = endTime.split(":").map(Number);
+    const diff = (eh * 60 + em - (sh * 60 + sm)) / 60;
+    return Math.max(Math.round(diff * 2) / 2, 0.5);
+};
 
 // ============================================
 // STAFF OPERATIONS
@@ -151,6 +160,10 @@ const updateEntry = async (req, res) => {
 // @access  HOD
 const getDepartmentEntries = async (req, res) => {
     try {
+        if (!req.user.departmentId) {
+            return res.status(403).json({ success: false, message: "You are not assigned to a department." });
+        }
+
         // Backend enforced filter — always uses HOD's departmentId
         const filter = { departmentId: req.user.departmentId };
         if (req.query.status) filter.status = req.query.status;
@@ -187,6 +200,10 @@ const getDepartmentEntries = async (req, res) => {
 // @access  HOD
 const getDepartmentPendingEntries = async (req, res) => {
     try {
+        if (!req.user.departmentId) {
+            return res.status(403).json({ success: false, message: "You are not assigned to a department." });
+        }
+
         const filter = {
             departmentId: req.user.departmentId,
             status: "Pending",
@@ -321,6 +338,99 @@ const rejectEntry = async (req, res) => {
     }
 };
 
+// ============================================
+// SMART TIMETABLE-DRIVEN ENTRY
+// ============================================
+
+// @desc    Log a diary entry from a timetable slot (auto-fills subject/sem/section/hours)
+// @route   POST /api/diary/from-timetable
+// @access  Staff
+const addEntryFromTimetable = async (req, res) => {
+    try {
+        const staffId = req.user._id;
+        const { timetableSlotId, date, description, notTaken, notTakenReason } = req.body;
+
+        if (!timetableSlotId || !date) {
+            return res.status(400).json({ success: false, message: "timetableSlotId and date are required" });
+        }
+
+        // 1. Fetch timetable slot (all info is on the slot itself)
+        const slot = await Timetable.findById(timetableSlotId);
+        if (!slot) {
+            return res.status(404).json({ success: false, message: "Timetable slot not found" });
+        }
+        if (slot.staffId.toString() !== staffId.toString()) {
+            return res.status(403).json({ success: false, message: "This timetable slot does not belong to you" });
+        }
+
+        // 2. Fetch staff's departmentId
+        const staff = await User.findById(staffId).select("departmentId");
+        if (!staff || !staff.departmentId) {
+            return res.status(400).json({ success: false, message: "You are not assigned to any department. Contact admin." });
+        }
+
+        // 3. Check for duplicate entry (same slot, same day)
+        const entryDate = new Date(date);
+        const dayStart = new Date(entryDate); dayStart.setHours(0, 0, 0, 0);
+        const dayEnd   = new Date(entryDate); dayEnd.setHours(23, 59, 59, 999);
+
+        const duplicate = await Diary.findOne({
+            staffId,
+            timetableSlotId: slot._id,
+            date: { $gte: dayStart, $lte: dayEnd },
+        });
+        if (duplicate) {
+            return res.status(400).json({ success: false, message: "You have already logged this class for today" });
+        }
+
+        // 4. Auto-calculate lesson number
+        const lessonNo = await Diary.countDocuments({
+            staffId,
+            timetableSlotId: { $ne: null },
+            section: slot.section,
+            subject: slot.subjectName,
+        }) + 1;
+
+        // 5. Map timetable workType to diary's workType enum
+        const diaryWorkType = (slot.workType === "Lab") ? "Lab" :
+                              (slot.workType === "Teaching" || slot.workType === "Tutorial") ? "Teaching" : "Teaching";
+
+        // 6. Create diary entry using slot's own fields
+        const entry = await Diary.create({
+            staffId,
+            departmentId: staff.departmentId,
+            date: entryDate,
+            subject: slot.subjectName,
+            semester: slot.semester,   // null if not set by staff (stored as-is)
+            section: slot.section,
+            hoursTaken: calcHours(slot.startTime, slot.endTime),
+            workType: diaryWorkType,
+            description: description || "",
+            timetableSlotId: slot._id,
+            courseAssignmentId: slot.courseAssignmentId || null,
+            lessonNo,
+            notTaken: notTaken || false,
+            notTakenReason: notTakenReason || "",
+        });
+
+        const populated = await Diary.findById(entry._id)
+            .populate("departmentId", "departmentName")
+            .populate("staffId", "name email");
+
+        res.status(201).json({
+            success: true,
+            message: "Diary entry logged successfully",
+            data: populated,
+        });
+    } catch (error) {
+        if (error.name === "ValidationError") {
+            const messages = Object.values(error.errors).map((e) => e.message);
+            return res.status(400).json({ success: false, message: messages.join(", ") });
+        }
+        res.status(500).json({ success: false, message: "Server error", error: error.message });
+    }
+};
+
 module.exports = {
     addEntry,
     getMyEntries,
@@ -329,4 +439,5 @@ module.exports = {
     getDepartmentPendingEntries,
     approveEntry,
     rejectEntry,
+    addEntryFromTimetable,
 };

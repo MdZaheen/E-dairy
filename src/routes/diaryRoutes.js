@@ -11,14 +11,18 @@ const {
     getDepartmentPendingEntries,
     approveEntry,
     rejectEntry,
+    addEntryFromTimetable,
 } = require("../controllers/diaryController");
 
 // ============ STAFF ROUTES ============
 
-// POST   /api/diary                          → Add new diary entry
+// POST   /api/diary                                → Add new diary entry (manual)
 router.post("/", verifyToken, authorizeRoles("Staff"), validateDiaryEntry, addEntry);
 
-// GET    /api/diary/my-entries?page=1&limit=10 → View own entries (paginated)
+// POST   /api/diary/from-timetable                → Smart entry from timetable slot
+router.post("/from-timetable", verifyToken, authorizeRoles("Staff"), addEntryFromTimetable);
+
+// GET    /api/diary/my-entries?page=1&limit=10     → View own entries (paginated)
 router.get("/my-entries", verifyToken, authorizeRoles("Staff"), getMyEntries);
 
 // PUT    /api/diary/:id                       → Update entry (only if Pending)

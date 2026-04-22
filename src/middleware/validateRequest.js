@@ -63,9 +63,9 @@ const validateDiaryEntry = (req, res, next) => {
 
     if (!date) errors.push("Date is required");
     if (!subject || subject.trim().length === 0) errors.push("Subject is required");
-    if (!semester || semester < 1 || semester > 8) errors.push("Semester must be between 1 and 8");
+    if (semester && (semester < 1 || semester > 8)) errors.push("Semester must be between 1 and 8");
     if (!section || section.trim().length === 0) errors.push("Section is required");
-    if (!hoursTaken || hoursTaken < 1 || hoursTaken > 8) errors.push("Hours must be between 1 and 8");
+    if (!hoursTaken || hoursTaken < 0.5 || hoursTaken > 8) errors.push("Hours must be between 0.5 and 8");
     if (!workType || !["Teaching", "Lab", "Exam", "Meeting", "Admin"].includes(workType)) {
         errors.push("Work type must be one of: Teaching, Lab, Exam, Meeting, Admin");
     }
