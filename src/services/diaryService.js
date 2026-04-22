@@ -90,14 +90,17 @@ const getMonthlyStats = async (staffId, year, month) => {
             $group: {
                 _id: null,
                 totalEntries: { $sum: 1 },
-                totalHours: { $sum: "$hoursTaken" },
-                approved: {
+                // Only sum hours if status is "Approved"
+                totalApprovedHours: { 
+                    $sum: { $cond: [{ $eq: ["$status", "Approved"] }, "$hoursTaken", 0] } 
+                },
+                approvedCount: {
                     $sum: { $cond: [{ $eq: ["$status", "Approved"] }, 1, 0] },
                 },
-                pending: {
+                pendingCount: {
                     $sum: { $cond: [{ $eq: ["$status", "Pending"] }, 1, 0] },
                 },
-                rejected: {
+                rejectedCount: {
                     $sum: { $cond: [{ $eq: ["$status", "Rejected"] }, 1, 0] },
                 },
             },
@@ -106,10 +109,10 @@ const getMonthlyStats = async (staffId, year, month) => {
             $project: {
                 _id: 0,
                 totalEntries: 1,
-                totalHours: 1,
-                approved: 1,
-                pending: 1,
-                rejected: 1,
+                totalApprovedHours: 1,
+                approvedCount: 1,
+                pendingCount: 1,
+                rejectedCount: 1,
             },
         },
     ]);
@@ -117,7 +120,7 @@ const getMonthlyStats = async (staffId, year, month) => {
     // Return default stats if no data found
     return stats.length > 0
         ? stats[0]
-        : { totalEntries: 0, totalHours: 0, approved: 0, pending: 0, rejected: 0 };
+        : { totalEntries: 0, totalApprovedHours: 0, approvedCount: 0, pendingCount: 0, rejectedCount: 0 };
 };
 
 module.exports = {

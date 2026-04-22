@@ -160,6 +160,10 @@ const updateEntry = async (req, res) => {
 // @access  HOD
 const getDepartmentEntries = async (req, res) => {
     try {
+        if (!req.user.departmentId) {
+            return res.status(403).json({ success: false, message: "You are not assigned to a department." });
+        }
+
         // Backend enforced filter — always uses HOD's departmentId
         const filter = { departmentId: req.user.departmentId };
         if (req.query.status) filter.status = req.query.status;
@@ -196,6 +200,10 @@ const getDepartmentEntries = async (req, res) => {
 // @access  HOD
 const getDepartmentPendingEntries = async (req, res) => {
     try {
+        if (!req.user.departmentId) {
+            return res.status(403).json({ success: false, message: "You are not assigned to a department." });
+        }
+
         const filter = {
             departmentId: req.user.departmentId,
             status: "Pending",

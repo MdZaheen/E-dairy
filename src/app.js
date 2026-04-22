@@ -20,10 +20,10 @@ app.use(express.json({ limit: "10kb" })); // Limit body size to prevent abuse
 // HTTP Request Logger
 app.use(morganMiddleware);
 
-// Rate Limiting — max 100 requests per 15 min per IP
+// Rate Limiting — max 1000 requests per 15 min per IP (bumped for dev & multiple sequential fetches)
 const generalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 100,
+    max: 1000,
     message: { success: false, message: "Too many requests. Please try again after 15 minutes." },
 });
 app.use("/api", generalLimiter);
